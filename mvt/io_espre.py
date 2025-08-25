@@ -91,13 +91,16 @@ def _extract_header_numbers(hdr):
                     pass
         return None
 
-    # BJD / BERV de QC si existen
-    bjd  = _g("HIERARCH ESO QC BJD", "BJD")
-    berv = _g("HIERARCH ESO QC BERV", "BERV")
+    # BJD (acepta BJD_TDB y variantes QC/DRS) y BERV
+    bjd  = _g("BJD_TDB", "BJD", "HIERARCH ESO QC BJD", "HIERARCH ESO DRS BJD")
+    berv = _g("BERV", "HIERARCH ESO QC BERV", "HIERARCH ESO DRS BERV")
 
-    # RV estrella: preferimos la del OBJ (sistémica); si no, la CCF medida
-    rv_star = _g("HIERARCH ESO OCS OBJ RV", "OCS OBJ RV",
-                 "HIERARCH ESO QC CCF RV", "RV")
+    # RV estrella: acepta tu RV_STAR y variantes CCF/OBJ
+    rv_star = _g("RV_STAR",
+                 "HIERARCH ESO OCS OBJ RV", "OCS OBJ RV",
+                 "HIERARCH ESO DRS CCF RV", "HIERARCH ESO QC CCF RV",
+                 "HIERARCH ESO QC RV", "RV")
+
     return bjd, berv, rv_star
 
 # ---------- nueva API detallada ----------
@@ -164,6 +167,13 @@ def read_s1d(path: str):
     wave, flux, err, meta = read_s1d_detailed(path)
     hdr = meta["primary_header"]
     bjd, berv, rv_star = _extract_header_numbers(hdr)
+    # valores por defecto seguros para el pipeline
+    if bjd is None:
+        bjd = np.nan
+    if berv is None:
+        berv = 0.0
+    if rv_star is None:
+        rv_star = 0.0
     return wave, flux, hdr, bjd, berv, rv_star
 
 # Alias historical

@@ -1,6 +1,6 @@
 from __future__ import annotations
 import numpy as np
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from .timephase import Ephemeris, phases_from_bjd, compute_contacts_auto
 from .rv import to_stellar_rest, planet_rv_kms
 
@@ -28,7 +28,11 @@ def make_residuals_and_vgrid(waves: List[np.ndarray],
                              half_width_A: float = 0.30,
                              vmin: float = -150.0,
                              vmax: float = +150.0,
-                             dv: float = 0.5) -> Tuple[np.ndarray, List[np.ndarray]]:
+                             dv: float = 0.5,
+                             *,
+                             contacts=None,
+                             it_mask: Optional[np.ndarray] = None
+                             ) -> Tuple[np.ndarray, List[np.ndarray]]:
     """Build residuals r=F/F_OOT−1, align to planet rest frame at a velocity grid.
 
     Returns
@@ -36,9 +40,15 @@ def make_residuals_and_vgrid(waves: List[np.ndarray],
     v_grid : ndarray [km/s]
     resid_v : list of ndarray, one per exposure on v_grid
     """
-    phases = phases_from_bjd(np.asarray(bjds, float), ephem.T0_bjdtdb, ephem.period_days)
-    contacts = compute_contacts_auto(ephem)
-    it_mask = (bjds >= contacts.T1) & (bjds <= contacts.T4)
+    bjds = np.asarray(bjds, float)
+    # Derive (or accept) in-transit mask in PHASE space (contacts are phases)
+    if it_mask is None:
+        if contacts is None:
+            contacts = compute_contacts_auto(ephem)  # T1..T4 in phase units
+        phases = phases_from_bjd(bjds, ephem.T0_bjdtdb, ephem.period_days)
+        it_mask = (phases >= contacts.T1) & (phases <= contacts.T4)
+    else:
+        it_mask = np.asarray(it_mask, bool)
 
     # Shift each to stellar rest if RV info supplied
     w_rest = []
@@ -51,9 +61,13 @@ def make_residuals_and_vgrid(waves: List[np.ndarray],
 
     # Build OOT master on native grid
     oot_mask = ~it_mask
+
     F_oot = [f for f, m in zip(fluxes, oot_mask) if m]
     if len(F_oot) == 0:
-        raise ValueError("No OOT exposures available")
+        n_it = int(np.sum(it_mask)); n_oot = int(np.sum(oot_mask))
+        raise ValueError(f"No OOT exposures available (IT={n_it}, OOT={n_oot}). "
+                         "Check contact phases / mask input.")
+
     _valid = [f for f in F_oot if f is not None and np.size(f) > 0 and np.isfinite(f).any()]
     if not _valid:
         raise ValueError("No valid out-of-transit flux arrays (all empty or NaN).")
@@ -65,7 +79,8 @@ def make_residuals_and_vgrid(waves: List[np.ndarray],
     # Velocity grid
     v_grid = np.arange(vmin, vmax + dv, dv, dtype=float)
 
-    # Planet velocities per exposure
+    # Planet velocities per exposure (requires phases)
+    phases = phases_from_bjd(bjds, ephem.T0_bjdtdb, ephem.period_days)
     v_p = planet_rv_kms(phases, ephem.Kp_kms)
 
     # Window + rebin each residual onto v_grid, shifted by v_p

@@ -1,0 +1,42 @@
+night_dir: data/synth_night
+outputs_dir: outputs/dryrun
+
+ephemeris:
+  T0_bjdtdb: 2457000.0
+  period_days: 2.218575
+  impact_b: 0.66
+  k_rprs: 0.157
+  a_over_rs: 8.86
+  inc_deg: 85.7
+  Kp_kms: 154.0
+
+contacts:
+  T1: -0.010
+  T2: -0.004
+  T3:  0.004
+  T4:  0.010
+
+lines:
+  NaID2:
+    center_A: 5889.951
+    half_width_A: 3.0
+
+fit:
+  init_sigma_A: 0.157     # Å; ≈ 8 km/s at Na D2
+  window_kms: 15.0
+
+null_tests:
+  control_offset_A: 2.0
+
+injection:
+  depths: [0.0005, 0.0010, 0.0015, 0.0020, 0.0025, 0.0030]
+  bootstrap_n: 800
+  rng_seed: 42
+
+figures:
+  stack_png: stack.png
+  nulls_png: nulls.png
+  inject_png: inject.png
+
+tables:
+  table71_csv: table71.csv
