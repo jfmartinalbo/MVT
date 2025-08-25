@@ -16,12 +16,13 @@ import os
 from pathlib import Path
 import numpy as np
 from astropy.io import fits
+from datetime import datetime, timedelta
 
 # ---- configurable knobs (keep in sync with your YAML) -----------------------
 N_EXP              = 40
 N_IN_TRANSIT       = 20                 # first 10 OOT, 20 in-transit, last 10 OOT
 CENTER_A           = 5889.951           # Na I D2 (air) — override in cfg if needed
-WINDOW_A           = 2.0                # +/- Å window written to file
+WINDOW_A           = 3.0                # +/- Å window written to file
 DLAM_A             = 0.01               # Å step
 Kp_KMS             = 154.0              # planet Kp for the RV curve
 SIGMA_KMS          = 8.0                # intrinsic line σ in km/s
@@ -32,6 +33,10 @@ P_DAYS             = 2.218575           # period (HD 189733 b)
 C_KMS              = 299792.458
 
 OUTDIR = Path("data/synth_night")
+
+START_ISO   = "2021-08-11T00:53:32"
+
+CADENCE_S   = 360 
 
 # -----------------------------------------------------------------------------
 
@@ -66,6 +71,8 @@ def main():
     v_from_lam = C_KMS * (lam / CENTER_A - 1.0)
 
     rng = np.random.default_rng(42)
+    
+    start_dt = datetime.fromisoformat(START_ISO)
 
     for i in range(N_EXP):
         # start with flat continuum
@@ -84,21 +91,23 @@ def main():
         # write minimal S1D-like FITS
         hdu = fits.PrimaryHDU(flux.astype("f4"))
         h = hdu.header
+        h["BJD_TDB"] = float(bjd[i])
         h["BJD"] = float(bjd[i])
         h["BERV"] = float(berv[i])
         h["RV_STAR"] = float(rv_star[i])
         h["CRVAL1"] = lam[0]
         h["CDELT1"] = DLAM_A
-        h["NAXIS1"] = nlam
+#        h["NAXIS1"] = nlam
         h["CUNIT1"] = "Angstrom"
-        h["OBJECT"] = "SYNTH_HD189733"
+        h["OBJECT"] = "HD189733"
         h["ITRANSIT"] = int(it_mask[i])
 
-        # store the wavelength array in extension 1 for convenience
+                # store the wavelength array in extension 1 for convenience
         hdu_lam = fits.ImageHDU(lam.astype("f8"), name="LAMBDA")
 
         hdul = fits.HDUList([hdu, hdu_lam])
-        out = OUTDIR / f"synth_{i:03d}.fits"
+        ts  = (start_dt + timedelta(seconds=i * CADENCE_S)).strftime("%Y-%m-%dT%H:%M:%S")
+        out = OUTDIR / f"ESPRE.{ts}_HD189733_S1D_cpl-7.1.2_DRS.fits"
         hdul.writeto(out, overwrite=True)
 
     print(f"Wrote {N_EXP} synthetic S1D files to {OUTDIR}/")

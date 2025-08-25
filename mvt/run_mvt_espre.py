@@ -247,7 +247,9 @@ def main() -> None:
     velocity_grid_kms, residual_profiles = make_residuals_and_vgrid(
         wavelength_A, flux, bjd_tdb_arr, eph,
         bervs=berv_kms, rv_stars=rv_star_kms,
-        center_A=center_A, half_width_A=half_A
+        center_A=center_A, half_width_A=half_A,
+        contacts=contacts,
+        it_mask=in_transit
     )
 
     # ──────────────────────────────────────────────────────────────────────
@@ -308,6 +310,15 @@ def main() -> None:
     # Outputs:
     #   stack_median : [N_v], stack_p16 : [N_v], stack_p84 : [N_v]
     # ──────────────────────────────────────────────────────────────────────
+
+    # --- Trim to columns that are covered by at least one exposure ---
+    stack_matrix = np.vstack(residual_profiles_for_stack)           # [N_exp, N_v]
+    valid_cols = np.isfinite(stack_matrix).any(axis=0)               # [N_v] bool
+
+    velocity_grid_kms = velocity_grid_kms[valid_cols]
+    residual_profiles_for_stack = [row[valid_cols] for row in residual_profiles_for_stack]
+    stack_matrix = np.vstack(residual_profiles_for_stack)            # recompute on trimmed grid
+
     stack_matrix = np.vstack(residual_profiles_for_stack)  # [N_exp, N_v]
     stack_median = np.nanmedian(stack_matrix, axis=0)
     stack_p16    = np.nanpercentile(stack_matrix, 16, axis=0)
@@ -410,11 +421,25 @@ def main() -> None:
     rng_inj = np.random.default_rng(cfg.get("injection", {}).get("rng_seed", 42))
     fit_window_kms = cfg["fit"].get("window_kms", C_KMS * (2.0 / center_A))  # default ≈ ±2 Å
 
-    injected_profile_sets: List[npt.NDArray[np.floating]] = []
-    for d in depths_injected:
-        inj_profiles = inject_into_residuals(residual_profiles_for_stack, velocity_grid_kms, d, init_sigma_kms, in_transit)
-        injected_profile_sets.append(np.asarray(inj_profiles, float))  # [N_exp, N_v]
+    # --- Baseline amplitude (no extra injection) ---
+    profiles_arr = np.asarray(residual_profiles_for_stack, float)  # [N_exp, N_v]
+    fit_window_kms = cfg["fit"].get("window_kms", C_KMS * (2.0 / center_A))
 
+    A0_med, A0_lo, A0_hi = _bootstrap_amp(
+        velocity_grid_kms, profiles_arr, fit_window_kms, init_sigma_kms,
+        nboot=int(cfg.get("injection", {}).get("bootstrap_n", 1000)),
+        rng=rng_inj
+    )
+
+    # --- Build injected profiles per depth on the TRIMMED grid ---
+    injected_profile_sets = []
+    for d in depths_injected:
+        inj = inject_into_residuals(
+            residual_profiles_for_stack, velocity_grid_kms, d, init_sigma_kms, in_transit
+        )
+        injected_profile_sets.append(np.asarray(inj, float))
+
+    # --- Recover delta depth (A_inj - A_base) ---
     rec, rec_lo, rec_hi = [], [], []
     for d, inj_set in zip(depths_injected, injected_profile_sets):
         A_med, A_lo, A_hi = _bootstrap_amp(
@@ -422,23 +447,29 @@ def main() -> None:
             nboot=int(cfg.get("injection", {}).get("bootstrap_n", 1000)),
             rng=rng_inj
         )
-        r, rlo, rhi = A_med/d, A_lo/d, A_hi/d
-        rlo, r, rhi = np.sort([rlo, r, rhi])
+        # conservative bounds: subtract opposite sides of the intervals
+        R_med = A_med - A0_med
+        R_lo  = A_lo  - A0_hi
+        R_hi  = A_hi  - A0_lo
+
+        # ensure ordering
+        rlo, r, rhi = np.sort([R_lo, R_med, R_hi])
         rec.append(r); rec_lo.append(rlo); rec_hi.append(rhi)
 
-    rec    = np.asarray(rec, float)
-    rec_lo = np.asarray(rec_lo, float)
-    rec_hi = np.asarray(rec_hi, float)
+    rec    = np.asarray(rec, float)       # fraction
+    rec_lo = np.asarray(rec_lo, float)    # fraction
+    rec_hi = np.asarray(rec_hi, float)    # fraction
 
-    # Plot & save outputs
-    _ = make_nonneg_yerr(rec, rec_lo, rec_hi)  # ensure safe error bars
+    # Plot & save (plots.py already formats in %)
+    _ = make_nonneg_yerr(rec, rec_lo, rec_hi)
     plot_injection_curves(
-        depths_injected, rec, rec_lo, rec_hi, os.path.join(fig_dir, cfg["figures"]["inject_png"])
+        depths_injected, rec, rec_lo, rec_hi,
+        os.path.join(fig_dir, cfg["figures"]["inject_png"])
     )
     write_injection_csv(
-        os.path.join(tab_dir, "injection_recovery.csv"), depths_injected, rec, rec_lo, rec_hi
+        os.path.join(tab_dir, "injection_recovery.csv"),
+        depths_injected, rec, rec_lo, rec_hi
     )
-
 
 if __name__ == "__main__":
     main()
