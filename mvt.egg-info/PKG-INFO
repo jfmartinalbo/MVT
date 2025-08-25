@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: mvt
+Version: 0.1.0
+Summary: Minimal-Viable-Transmission pipeline for high-res spectroscopy
+Author: J. F. Martín-Albo
+Requires-Python: >=3.10
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: astropy
+Requires-Dist: pandas
+Requires-Dist: matplotlib
+Requires-Dist: statsmodels
+Requires-Dist: pyyaml

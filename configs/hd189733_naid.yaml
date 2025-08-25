@@ -1,0 +1,54 @@
+target: "HD 189733 b"                  # str
+star: "HD 189733"                      # str
+
+night_dir: "/Volumes/TEA/MVT/data/raw/ESPRE_2021-08-11"   # str path
+outputs_dir: "/Volumes/TEA/MVT/outputs"                   # str path
+actin_csv: "/Volumes/TEA/MVT/data/indices/per_exposure_indices.csv"   # str path (optional)
+
+ephemeris:
+  T0_bjdtdb: 2459446.498519           # float (days, BJD_TDB)
+  period_days: 2.218575198            # float (days)
+  impact_b: 0.672                     # float (dimensionless)
+  k_rprs: 0.1572                      # float (Rp/Rs)
+  a_over_rs: 8.92                     # float (a/Rs)
+  inc_deg: 85.68                      # float (degrees)
+  Kp_kms: 154.0                       # float (km/s)
+
+# Transit contacts controls (Task 1)
+contacts:
+  mode: "auto"                        # "auto" | "manual"
+  T1_bjdtdb: null                     # float | null (only if mode="manual")
+  T2_bjdtdb: null                     # float | null
+  T3_bjdtdb: null                     # float | null
+  T4_bjdtdb: null                     # float | null
+
+wavelength_frame: "vacuum"            # "vacuum" | "air"
+rest_frame: "stellar"                 # currently shift to stellar rest
+
+lines:
+  NaID1: { center_A: 5895.924, half_width_A: 0.30 }   # floats (Å)
+  NaID2: { center_A: 5889.951, half_width_A: 0.30 }   # floats (Å)
+
+continua:
+  NaID:
+    - [5881.0, 5886.0]
+    - [5899.5, 5904.5]
+
+stack: { estimator: "median", bootstrap_n: 1000 }      # str, int
+fit:   { model: "gauss",  init_sigma_A: 0.06 }         # str, float (Å)
+
+# Detrending toggle (Task 4)
+detrend:
+  enable: false
+  predictors: ["S_index","Halpha_index","ccf_bis_ms","ccf_fwhm_kms"]  # list[str]
+
+# Null tests config (Task 2)
+null_tests:
+  control_offset_A: 2.0               # float (Å) off-line control window shift
+
+# Injection–recovery config (Task 3)
+injection:
+  depths: [0.0005, 0.0010, 0.0015, 0.0020, 0.0025, 0.0030]   # list[float] (fractional depths: 0.05–0.30%)
+
+tables:  { table4x_csv: "per_exposure_indices.csv", table71_csv: "table_7_1_line_metrics.csv" }
+figures: { stack_png: "fig_7_1_stack.png", nulls_png: "fig_7_2_nulls.png", inject_png: "fig_7_3_inject.png" }

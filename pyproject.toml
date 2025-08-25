@@ -1,0 +1,12 @@
+[project]
+name = "mvt"
+version = "0.1.0"
+description = "Minimal-Viable-Transmission pipeline for high-res spectroscopy"
+authors = [{ name = "J. F. Martín-Albo" }]
+requires-python = ">=3.10"
+dependencies = [
+  "numpy","scipy","astropy","pandas","matplotlib","statsmodels","pyyaml"
+]
+
+[tool.setuptools]
+packages = ["mvt"]
