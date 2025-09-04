@@ -48,22 +48,70 @@ def compute_contacts_auto(ephem: Ephemeris) -> Contacts:
     return Contacts(T1=T1, T2=T2, T3=T3, T4=T4)
 
 def contacts_from_yaml(ephem: Ephemeris, cfg_contacts: Optional[Dict]) -> Contacts:
-    if not cfg_contacts or cfg_contacts.get("mode", "auto") == "auto":
-        base = compute_contacts_auto(ephem)
-    else:
-        base = compute_contacts_auto(ephem)
-    if cfg_contacts:
-        for key in ("T1", "T2", "T3", "T4"):
-            v = cfg_contacts.get(f"{key}_bjdtdb")
-            if v is not None:
-                setattr(base, key, float(v))
+    """
+    Devuelve siempre contactos en UNIDADES DE FASE.
+    Acepta en YAML:
+      - Fase directa:   contacts: {T1: -0.010, T2: -0.004, T3: 0.004, T4: 0.010}
+      - En BJD_TDB:     contacts: {T1_bjdtdb: ..., ...}
+    Si se dan en BJD, se convierten a fase usando (bjd - T0)/P → (-0.5, 0.5].
+    """
+    # base (en fase) a partir de la geometría
+    base = compute_contacts_auto(ephem)  # devuelve T1..T4 en fase
+
+    if not cfg_contacts:
+        return base
+
+    # 1) Overrides en fase si existen
+    for key in ("T1", "T2", "T3", "T4"):
+        v = cfg_contacts.get(key)
+        if v is not None:
+            setattr(base, key, float(v))
+
+    # 2) Overrides en BJD si existen → convertir a fase
+    for key in ("T1", "T2", "T3", "T4"):
+        v_bjd = cfg_contacts.get(f"{key}_bjdtdb")
+        if v_bjd is not None:
+            phi = float(
+                phases_from_bjd(
+                    np.array([v_bjd], dtype=float),
+                    ephem.T0_bjdtdb,
+                    ephem.period_days
+                )[0]
+            )
+            # normaliza a (-0.5, 0.5]
+            phi = ((phi + 0.5) % 1.0) - 0.5
+            setattr(base, key, phi)
+
+    # 3) Validación (monótonos en fase)
     if not (base.T1 < base.T2 < base.T3 < base.T4):
-        raise ValueError("Contacts are not monotonic T1<T2<T3<T4")
+        raise ValueError(f"Contacts are not monotonic in phase: {base}")
+
     return base
 
-def in_transit_mask(bjd: np.ndarray, contacts: Contacts) -> np.ndarray:
+def in_transit_mask(
+    bjd: np.ndarray,
+    contacts: Contacts,
+    ephem: Optional[Ephemeris] = None,
+) -> np.ndarray:
+    """
+    Return a boolean mask of in-transit exposures.
+
+    - If contacts.T1..T4 look like phases (|value| < ~0.5), we compare in phase.
+      In that case we need `ephem` to convert BJD -> phase.
+    - Otherwise we assume contacts are in BJD_TDB and compare in time.
+    """
     bjd = np.asarray(bjd, float)
-    return (bjd >= contacts.T1) & (bjd <= contacts.T4)
+    T = np.array([contacts.T1, contacts.T2, contacts.T3, contacts.T4], float)
+
+    # Heuristic: if all |T_i| < 0.5, treat contacts as phases
+    if np.all(np.isfinite(T)) and np.all(np.abs(T) < 0.5):
+        if ephem is None:
+            raise ValueError("in_transit_mask: contacts are in phase; Ephemeris is required.")
+        ph = phases_from_bjd(bjd, ephem.T0_bjdtdb, ephem.period_days)
+        return (ph >= contacts.T1) & (ph <= contacts.T4)
+    else:
+        # Treat contacts as BJD_TDB
+        return (bjd >= contacts.T1) & (bjd <= contacts.T4)
 
 def kp_radial_velocity(phases: np.ndarray, Kp_kms: float) -> np.ndarray:
     return Kp_kms * np.sin(2.0 * np.pi * phases)

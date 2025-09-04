@@ -1,0 +1,67 @@
+night_dir: data/raw/ESPRE_2021-08-11
+outputs_dir: outputs/espre_2021-08-11
+
+target_line: NaID2
+
+# Is the incoming wavelength grid already corrected to the barycenter?
+input_frame: barycentric   # {native | barycentric}
+
+ephemeris:
+  T0_bjdtdb: 2456999.409715
+  period_days: 2.218575
+  impact_b: 0.66
+  k_rprs: 0.157
+  a_over_rs: 8.86
+  inc_deg: 85.7
+  Kp_kms: 154.0
+
+contacts:
+  T1: -0.016
+  T2: -0.010
+  T3:  0.010
+  T4:  0.016
+
+lines:
+  NaID2:   {center_A: 5891.583, half_width_A: 1.5}   # Na D2 (VAC)
+  NaID1:   {center_A: 5895.924, half_width_A: 1.5}   # Na D1 (AIR)
+  LiI6707: {center_A: 6707.0, half_width_A: 1.5}   # Li I 670.8 nm (AIR)
+  
+fit:
+  init_sigma_A: 0.157       # ~8 km/s at Na D2
+  window_kms: 15.0
+
+null_tests:
+  control_offset_A: 2.0
+
+residuals:
+  flatten_planet_sidebands: true
+  subtract_additive_trend: true       # NEW → enables step A
+  sideband_gap_kms: 70.0    # widen if you still see slope in residual wings
+
+figures:
+  colormap_Npix: 401
+  colormap_stellar_flux_png:  colormap_stellar_flux.png
+  colormap_stellar_resid_png: colormap_stellar_resid.png
+  colormap_planet_lambda_png: colormap_planet_lambda.png
+  stack_png:  stack.png
+  nulls_png:  nulls.png
+  inject_png: inject.png
+  phase_coverage_png: phase_coverage.png
+  colormap_percentile: 99.5      # robust autoscale
+  colormap_symmetric: true       # center at zero for residuals
+  colormap_vlim_resid: auto      # or [-0.02, 0.02]
+  colormap_vlim_flux:  auto      # flux can stay wider or 'auto'
+  colormap_cmap_resid: RdBu_r    # diverging is better for residuals centered at 0
+  
+tables:
+  table71_csv: table_71.csv
+
+debug:
+  enable: true
+  off_line_kms: [-120.0, -80.0]
+
+# (Optional: keep if/when you re-enable injection step)
+injection:
+  depths: [0.0005, 0.0010, 0.0015, 0.0020, 0.0025, 0.0030]
+  bootstrap_n: 800
+  rng_seed: 42
