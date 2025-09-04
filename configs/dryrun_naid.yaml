@@ -40,3 +40,8 @@ figures:
 
 tables:
   table71_csv: table71.csv
+  
+debug:
+  enable: true
+  n_window_examples: 4
+  off_line_kms: [-120, -80]   # off-line band to probe baseline

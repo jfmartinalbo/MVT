@@ -6,3 +6,19 @@ reports/
 *.fits
 data/
 .ipynb_checkpoints/
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+
+data/
+outputs/
+*.fits
+*.fits.gz
+
+mvt\ frozen\ 250901/
+*.patch
+*.diff
+
+.DS_Store
+.vscode/
+.idea/

@@ -11,6 +11,9 @@ class StackResult:
     p84: np.ndarray
 
 def _percentile_stack(v_grid: np.ndarray, profiles: List[np.ndarray]) -> StackResult:
+    if not profiles:
+        nan = np.full_like(v_grid, np.nan, dtype=float)
+        return StackResult(v_grid=v_grid, median=nan, p16=nan.copy(), p84=nan.copy())
     arr = np.vstack(profiles)
     med = np.nanmedian(arr, axis=0)
     p16 = np.nanpercentile(arr, 16, axis=0)
@@ -18,6 +21,8 @@ def _percentile_stack(v_grid: np.ndarray, profiles: List[np.ndarray]) -> StackRe
     return StackResult(v_grid=v_grid, median=med, p16=p16, p84=p84)
 
 def _interp_shift(v_grid: np.ndarray, prof: np.ndarray, dv: float) -> np.ndarray:
+    if prof is None or len(prof) == 0:
+        return np.full_like(v_grid, np.nan, dtype=float)
     return np.interp(v_grid, v_grid - dv, prof, left=np.nan, right=np.nan)
 
 def null_oot_only(v_grid: np.ndarray, resid_v: List[np.ndarray], in_transit: np.ndarray) -> StackResult:
